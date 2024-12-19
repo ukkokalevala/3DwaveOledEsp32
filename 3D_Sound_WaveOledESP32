@@ -7,7 +7,7 @@
 #define OLED_RESET    -1  // No reset pin
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-#define SOUND_SENSOR_PIN 4 // ADC-capable pin on ESP32
+#define SOUND_SENSOR_PIN 1 // ADC-capable pin on ESP32 I personally found GPIO 1 works much better
 #define SDA_PIN 7           // OLED SDA
 #define SCL_PIN 6           // OLED SCL
 

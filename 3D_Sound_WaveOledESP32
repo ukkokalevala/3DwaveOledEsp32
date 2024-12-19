@@ -1,0 +1,82 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET    -1  // No reset pin
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+#define SOUND_SENSOR_PIN 4 // ADC-capable pin on ESP32
+#define SDA_PIN 7           // OLED SDA
+#define SCL_PIN 6           // OLED SCL
+
+const int depthLayers = 5;                // Number of depth layers
+float waveData[depthLayers][SCREEN_WIDTH]; // Store waveforms for each layer
+float amplitude = SCREEN_HEIGHT / 4;      // Initial amplitude
+float sensitivity = 2.0;                  // Sensitivity multiplier
+float baseAmplitude = 5;                  // Base amplitude for soft sounds
+
+void setup() {
+  // Initialize Serial for debugging
+  Serial.begin(115200);
+
+  // Initialize I2C for OLED
+  Wire.begin(SDA_PIN, SCL_PIN);
+
+  // Initialize OLED
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3C for most OLEDs
+    Serial.println(F("SSD1306 allocation failed"));
+    while (true); // Don't proceed, halt execution
+  }
+
+  display.clearDisplay();
+  display.display();
+
+  // Configure sound sensor pin
+  pinMode(SOUND_SENSOR_PIN, INPUT);
+
+  // Initialize wave data to mid-screen
+  for (int i = 0; i < depthLayers; i++) {
+    for (int x = 0; x < SCREEN_WIDTH; x++) {
+      waveData[i][x] = SCREEN_HEIGHT / 2;
+    }
+  }
+}
+
+void loop() {
+  // Read sound sensor data
+  int soundLevel = analogRead(SOUND_SENSOR_PIN);
+  
+  // Apply non-linear scaling for softer sounds
+  float normalized = pow((float)soundLevel / 4095, 1.5) * (SCREEN_HEIGHT / 2); // Non-linear scaling
+  
+  // Combine normalized input with sensitivity and a base amplitude
+  amplitude = baseAmplitude + (amplitude * 0.7 + (normalized * sensitivity) * 0.3);
+
+  // Shift old wave data backward
+  for (int i = depthLayers - 1; i > 0; i--) {
+    for (int x = 0; x < SCREEN_WIDTH; x++) {
+      waveData[i][x] = waveData[i - 1][x];
+    }
+  }
+
+  // Generate new front wave
+  for (int x = 0; x < SCREEN_WIDTH; x++) {
+    waveData[0][x] = SCREEN_HEIGHT / 2 + amplitude * sin((x * 0.2) + millis() / 100.0);
+  }
+
+  // Clear display for the next frame
+  display.clearDisplay();
+
+  // Draw the 3D wave
+  for (int layer = depthLayers - 1; layer >= 0; layer--) {
+    for (int x = 0; x < SCREEN_WIDTH; x++) {
+      uint8_t y = waveData[layer][x];
+      display.drawPixel(x, y, SSD1306_WHITE);
+    }
+  }
+
+  display.display();
+  delay(50); // Adjust for smooth animation
+}
